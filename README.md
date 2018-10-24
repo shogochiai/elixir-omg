@@ -1,5 +1,7 @@
 Demo of logs scrubbing from STDOUT and fed by docker to host's syslog. Might be a good starting point for investigation.
 
+All changes to apps/*/lib/application.ex were done to remove the need to have geth, database, config etc.
+
 
 Building docker container:
 
