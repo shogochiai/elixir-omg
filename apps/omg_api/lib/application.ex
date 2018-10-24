@@ -18,6 +18,26 @@ defmodule OMG.API.Application do
   See here (children) for the processes that compose into the Child Chain server.
   """
 
+  defmodule Loop do
+    use OMG.API.LoggerExt
+    use GenServer
+
+    def start_link(_args) do
+      GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
+    end
+
+    def init(:ok) do
+      send(self(), :tick)
+      {:ok, 0}
+    end
+
+    def handle_info(:tick, counter) do
+      Logger.warn("tick # #{counter}")
+      Process.send_after(self(), :tick, 1000)
+      {:noreply, counter + 1}
+    end
+  end
+
   use Application
   use OMG.API.LoggerExt
   import Supervisor.Spec
@@ -26,39 +46,7 @@ defmodule OMG.API.Application do
     block_finality_margin = Application.get_env(:omg_api, :ethereum_event_block_finality_margin)
 
     children = [
-      {OMG.API.State, []},
-      {OMG.API.BlockQueue.Server, []},
-      {OMG.API.FreshBlocks, []},
-      {OMG.API.FeeChecker, []},
-      {OMG.API.RootChainCoordinator, MapSet.new([:depositer, :exiter])},
-      worker(
-        OMG.API.EthereumEventListener,
-        [
-          %{
-            synced_height_update_key: :last_depositor_eth_height,
-            service_name: :depositer,
-            block_finality_margin: block_finality_margin,
-            get_events_callback: &OMG.Eth.RootChain.get_deposits/2,
-            process_events_callback: &OMG.API.State.deposit/1,
-            get_last_synced_height_callback: &OMG.Eth.RootChain.get_root_deployment_height/0
-          }
-        ],
-        id: :depositer
-      ),
-      worker(
-        OMG.API.EthereumEventListener,
-        [
-          %{
-            synced_height_update_key: :last_exiter_eth_height,
-            service_name: :exiter,
-            block_finality_margin: block_finality_margin,
-            get_events_callback: &OMG.Eth.RootChain.get_exits/2,
-            process_events_callback: &OMG.API.State.exit_utxos/1,
-            get_last_synced_height_callback: &OMG.Eth.RootChain.get_root_deployment_height/0
-          }
-        ],
-        id: :exiter
-      )
+      {OMG.API.Application.Loop, []},
     ]
 
     _ = Logger.info(fn -> "Started application OMG.API.Application" end)

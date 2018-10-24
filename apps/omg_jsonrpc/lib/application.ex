@@ -21,7 +21,6 @@ defmodule OMG.JSONRPC.Application do
     omg_port = Application.get_env(:omg_jsonrpc, :omg_api_rpc_port)
 
     children = [
-      JSONRPC2.Servers.HTTP.child_spec(:http, OMG.JSONRPC.Server.Handler, port: omg_port)
     ]
 
     opts = [strategy: :one_for_one, name: OMG.JSONRPC.Supervisor]

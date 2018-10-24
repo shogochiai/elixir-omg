@@ -23,7 +23,6 @@ defmodule OMG.DB.Application do
     server_name = Application.get_env(:omg_db, :server_name)
 
     children = [
-      {server_module, name: server_name, db_path: db_path}
     ]
 
     opts = [strategy: :one_for_one, name: OMG.DB.Supervisor]
