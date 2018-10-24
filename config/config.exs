@@ -11,7 +11,11 @@ import_config "../apps/*/config/config.exs"
 
 # Sample configuration (overrides the imported configuration above):
 
-config :logger, :console,
+config :logger,
+  handle_otp_reports: false,
+  handle_sasl_reports: false
+
+config :logger, :debug,
   level: :info,
   format: "$date $time [$level] $metadata⋅$message⋅\n",
   metadata: [:module, :function, :request_id]
