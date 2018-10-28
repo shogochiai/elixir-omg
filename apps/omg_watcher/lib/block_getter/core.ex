@@ -538,23 +538,43 @@ defmodule OMG.Watcher.BlockGetter.Core do
   @spec figure_out_exact_sync_height([%{blknum: pos_integer, eth_height: pos_integer}], pos_integer, pos_integer) ::
           pos_integer
   def figure_out_exact_sync_height(submissions, synced_height, child_top_block_number) do
+    Logger.info(fn ->
+      "synced_height: #{inspect synced_height}, child_top_block_number: #{inspect(child_top_block_number)}}"
+    end)
+    Logger.info(fn ->
+      "submissions are #{inspect submissions}"
+    end)
+
     # first get the exact match for the eth_height of top child blknum
     submissions
     |> Enum.find(fn %{blknum: blknum} -> blknum == child_top_block_number end)
     # if it exists - good, if it doesn't - the submission is old and we're probably good
     |> case do
       %{eth_height: exact_height} ->
+        Logger.info(fn -> "Found exact_height: #{inspect(exact_height)}" end)
         # here we need to take into account multiple child submissions in one eth height
         # we can only treat as synced, if all children blocks have been processed
-        submissions
-        # get all the neighbors of the child block last applied
-        |> Enum.filter(fn %{eth_height: eth_height} -> eth_height == exact_height end)
+        same_height_blknums =
+          submissions
+          # get all the neighbors of the child block last applied
+          |> Enum.filter(fn %{eth_height: eth_height} -> eth_height == exact_height end)
+
+        Logger.info(fn -> "On exact_height: #{inspect(exact_height)} there are #{inspect(same_height_blknums)}" end)
         # get the youngest of neighbors. If there are no submissions there, just assume we've found in previous step
+        same_height_blknums
         |> Enum.max_by(fn %{blknum: blknum} -> blknum end)
         # if it is our last applied child block then the eth height is good to go, otherwise back off by one eth block
         |> case do
-          %{blknum: ^child_top_block_number} -> exact_height
-          _ -> max(0, exact_height - 1)
+          %{blknum: ^child_top_block_number} ->
+            Logger.info(fn -> "Yes, this is the blknum in the block (#{inspect(child_top_block_number)})" end)
+            exact_height
+
+          other_blknum ->
+            Logger.info(fn ->
+              "Nope, we are not on the last blknum : #{inspect(other_blknum)} < #{inspect(child_top_block_number)}"
+            end)
+
+            max(0, exact_height - 1)
         end
 
       nil ->
