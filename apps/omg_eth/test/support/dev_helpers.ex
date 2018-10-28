@@ -62,6 +62,8 @@ defmodule OMG.Eth.DevHelpers do
       contract_addr: #{inspect(to_hex(contract_addr))},
       txhash_contract: #{inspect(to_hex(txhash))},
       authority_addr: #{inspect(to_hex(authority_addr))}
+
+    import_config "static_config.exs"
     """
   end
 
