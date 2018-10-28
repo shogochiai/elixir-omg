@@ -99,6 +99,8 @@ defmodule OMG.Watcher.BlockGetter do
 
     {:ok, block_submissions} = Eth.RootChain.get_block_submitted_events({synced_height, current_eth_height})
     exact_synced_height = Core.figure_out_exact_sync_height(block_submissions, synced_height, child_top_block_number)
+    Logger.info(fn -> "Determined sync height is: #{inspect exact_synced_height}" end)
+    
 
     :ok = RootChainCoordinator.check_in(exact_synced_height, __MODULE__)
 

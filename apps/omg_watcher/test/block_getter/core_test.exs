@@ -354,6 +354,28 @@ defmodule OMG.Watcher.BlockGetter.CoreTest do
              )
   end
 
+  @tag :wrong
+  test "figure out synced height, possible regression" do
+    subs =
+      [
+        %{blknum: 13984000, eth_height: 14451},
+        %{blknum: 13985000, eth_height: 14451},
+        %{blknum: 13986000, eth_height: 14454},
+        %{blknum: 13987000, eth_height: 14454},
+        %{blknum: 13988000, eth_height: 14455},
+        %{blknum: 13989000, eth_height: 14455},
+        %{blknum: 13990000, eth_height: 14457},
+        %{blknum: 13991000, eth_height: 14458},
+        %{blknum: 13992000, eth_height: 14459},
+        %{blknum: 13993000, eth_height: 14460},
+        %{blknum: 13994000, eth_height: 14461},
+        %{blknum: 13995000, eth_height: 14461},
+        %{blknum: 13996000, eth_height: 14463},
+        %{blknum: 13997000, eth_height: 14463}
+      ]
+    assert 14460 == Core.figure_out_exact_sync_height(subs, 14462, 13994000)
+  end
+
   test "applying block updates height" do
     state =
       init_state(synced_height: 0, opts: [maximum_number_of_pending_blocks: 5])
