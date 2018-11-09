@@ -62,6 +62,7 @@ defmodule OMG.Watcher.Web.Controller.Utxo do
           properties do
             currency(:string, "Currency of the utxo", required: true)
             amount(:integer, "Amount of the currency", required: true)
+            owner(:string, "Address of the owner of the utxo", required: true)
 
             blknum(
               :integer,
@@ -71,17 +72,15 @@ defmodule OMG.Watcher.Web.Controller.Utxo do
 
             txindex(:integer, "Number of transaction that created the utxo", required: true)
             oindex(:integer, "Output index in the transaction", required: true)
-            txbytes(:string, "RLP encoded signed transaction that created the utxo", required: true)
           end
 
           example(%{
             currency: "0000000000000000000000000000000000000000",
             amount: 10,
+            owner: "B3256026863EB6AE5B06FA396AB09069784EA8EA",
             blknum: 1000,
             txindex: 1,
-            oindex: 0,
-            txbytes:
-              "F8CF0101808080809400000000000000000000000000000000000000009459D87A1B128920C828C2648C9211F6626A9C82F28203E894000000000000000000000000000000000000000080B84196BE9F44CE42D5A20DC382AAB8C940BD25E8A9A7E50B9CE976ADEEB7EDE1348B1F7BBA11C5EB235CE732AD960EF7E71330C34C137A5D2C09FA9A2F8F680911CA1CB8410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            oindex: 0
           })
         end,
       Utxos:
