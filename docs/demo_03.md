@@ -27,10 +27,23 @@ alias OMG.API.TestHelper
 
 {:ok, contract_addr} = Application.get_env(:omg_eth, :contract_addr) |> Crypto.decode_address()
 
+# defaults
+opts = [initial_funds: trunc(:math.pow(10, 18)) * 1]
+
+# modify and execute for custom configuration
+####
+# configure to the source of test ether
+faucet =
+opts = Keyword.put(opts, :faucet, faucet)
+# that has at least #alices times this to spare
+initial_funds_eth =
+opts = Keyword.put(opts, :initial_funds, trunc(:math.pow(10, 18) * initial_funds_eth))
+####
+
 generate = fn ->
   alice = TestHelper.generate_entity()
 
-  {:ok, _alice_enc} = Eth.DevHelpers.import_unlock_fund(alice)
+  {:ok, _alice_enc} = Eth.DevHelpers.import_unlock_fund(alice, opts)
   alice
 end
 
