@@ -32,19 +32,26 @@ defmodule OMG.Watcher.ExitProcessor.Core do
   @default_sla_margin 10
   @zero_address Crypto.zero_address()
 
+  @type exit_id() :: pos_integer()
+  @type output_offset() :: 0..7
+
   defstruct [:sla_margin, exits: %{}, in_flight_exits: %{}]
 
   @type t :: %__MODULE__{
           sla_margin: non_neg_integer(),
           exits: %{Utxo.Position.t() => ExitInfo.t()},
-          in_flight_exits: %{binary() => InFlightExitInfo.t()}
+          in_flight_exits: %{exit_id() => InFlightExitInfo.t()}
         }
 
   @doc """
   Reads database-specific list of exits and turns them into current state
   """
-  @spec init(db_exits :: [{Utxo.Position.t(), map}], non_neg_integer) :: {:ok, t()}
-  def init(db_exits, sla_margin \\ @default_sla_margin) do
+  @spec init(
+          db_exits :: [{Utxo.Position.t(), map}],
+          db_in_flight_exits :: [{exit_id(), InFlightExitInfo.t()}],
+          sla_margin :: non_neg_integer
+        ) :: {:ok, t()}
+  def init(db_exits, db_in_flight_exits, sla_margin \\ @default_sla_margin) do
     {:ok,
      %__MODULE__{
        exits: db_exits |> Enum.map(fn {k, v} -> {k, struct(ExitInfo, v)} end) |> Map.new(),
@@ -87,6 +94,13 @@ defmodule OMG.Watcher.ExitProcessor.Core do
     {%{state | exits: Map.merge(exits, new_exits_map)}, db_updates}
   end
 
+  @spec new_piggybacks(t(), [{exit_id(), output_offset()}]) :: t()
+  def new_piggybacks(state, piggybacks) do
+    db_updates = []
+    updated_ifes_map = []
+    {%{state | in_flight_exits: Map.merge(state.in_flight_exits, updated_ifes_map)}, db_updates}
+  end
+
   defp parse_contract_status({@zero_address, _contract_token, _contract_amount}), do: false
   defp parse_contract_status({_contract_owner, _contract_token, _contract_amount}), do: true
 
@@ -101,7 +115,7 @@ defmodule OMG.Watcher.ExitProcessor.Core do
       do: {:error, :unexpected_events}
 
   def new_in_flight_exits(state, exits, in_flight_exits_contract_data) do
-    # TODO
+    %{state | in_flight_exits: Map.merge(state.in_flight_exits, in_flight_exits_contract_data)}
   end
 
   @doc """
@@ -158,10 +172,15 @@ defmodule OMG.Watcher.ExitProcessor.Core do
   All the active exits, in-flight exits, exiting output piggybacks etc., based on the current tracked state
   """
   @spec get_exiting_utxo_positions(t()) :: list(Utxo.Position.t())
-  def get_exiting_utxo_positions(%__MODULE__{exits: exits} = _state) do
-    exits
-    |> Enum.filter(fn {_key, %ExitInfo{is_active: is_active}} -> is_active end)
-    |> Enum.map(fn {utxo_pos, _value} -> utxo_pos end)
+  def get_exiting_utxo_positions(%__MODULE__{exits: exits, in_flight_exits: ifes} = _state) do
+    standard_exits_pos =
+      exits
+      |> Enum.filter(fn {_key, %ExitInfo{is_active: is_active}} -> is_active end)
+      |> Enum.map(fn {utxo_pos, _value} -> utxo_pos end)
+    ife_pos =
+      ifes
+      |> Enum.flat_map(fn {_, ife} -> InFlightExitInfo.get_exiting_utxo_positions(ife) end)
+    ife_pos ++ standard_exits_pos
   end
 
   @doc """

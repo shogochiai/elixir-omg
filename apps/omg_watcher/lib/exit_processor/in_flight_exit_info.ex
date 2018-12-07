@@ -27,18 +27,18 @@ defmodule OMG.Watcher.ExitProcessor.InFlightExitInfo do
     :timestamp,
     :priority,
     # piggybacking
-    :exit_map,
+    exit_map: <<0,0>>,
     tx_pos: nil,
     oldest_competitor: 0,
     is_canonical: true
   ]
 
   @type t :: %__MODULE__{
-          tx: Transaction.Signed,
-          tx_pos: Utxo.Position,
+          tx: Transaction.Signed.t(),
+          tx_pos: nil | Utxo.Position.t(),
           timestamp: pos_integer(),
           priority: non_neg_integer(),
-          exit_map: binary(),
+          exit_map: <<_::16>>,
           oldest_competitor: non_neg_integer(),
           is_canonical: boolean()
         }
@@ -47,5 +47,45 @@ defmodule OMG.Watcher.ExitProcessor.InFlightExitInfo do
     # cut the oldest 8 bytes and shift left by one bit (least significant bit is set to 0)
     <<_::65, ife_id::bitstring-size(192)>> = <<tx_hash::bitstring, <<0::1>>::bitstring>>
     ife_id
+  end
+
+  def get_exiting_utxo_pos(ife = %__MODULE__{is_canonical: false}) do
+    ife.inputs
+    |> Enum.with_index()
+    |> Enum.filter(&(is_active(ife, :input, elem(&1, 1))))
+    |> Enum.map(&(&1 |> elem(0) |> elem(0)))
+  end
+  def get_exiting_utxo_pos(ife = %__MODULE__{is_canonical: true, tx_pos: tx_pos}) when tx_pos != nil do
+    active_outputs_offsets =
+      ife.outputs
+      |> Enum.with_index()
+      |> Enum.filter(&(is_active(ife, :input, elem(&1, 1))))
+      |> Enum.map(&(&1 |> elem(1)))
+    {:utxo_position, blknum, txindex, _} = tx_pos
+    for pos <- active_outputs_offsets, do: {:utxo_position, blknum, txindex, pos}
+  end
+  def get_exiting_utxo_pos(_) do
+    []
+  end
+
+  def is_piggybacked(%__MODULE__{exit_map: bitmap}, type, index) do
+    read_bit(bitmap, index + offset(type)) == 1
+  end
+
+  def is_finalized(%__MODULE__{exit_map: bitmap}, type, index) do
+    read_bit(bitmap, 8 + index + offset(type)) == 1
+  end
+
+  def is_active(ife, type, index) do
+    is_piggybacked(ife, type, index) and not is_finalized(ife, type, index)
+  end
+
+  defp offset(:input), do: 0
+  defp offset(:output), do: 4
+
+  defp read_bit(bitmap, index) do
+    prefix = 15 - index
+    <<_::bits-size(prefix), bit::integer-size(1), _::bits>> = bitmap
+    bit
   end
 end
