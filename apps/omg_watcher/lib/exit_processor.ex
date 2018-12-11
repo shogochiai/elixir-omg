@@ -48,8 +48,8 @@ defmodule OMG.Watcher.ExitProcessor do
   Accepts events and processes them in the state - new in flight exits are tracked.
   Returns `db_updates` due and relies on the caller to do persistence
   """
-  def new_in_flight_exits(exits) do
-    GenServer.call(__MODULE__, {:new_in_flight_exits, exits})
+  def new_in_flight_exits(in_flight_exit_started_events) do
+    GenServer.call(__MODULE__, {:new_in_flight_exits, in_flight_exit_started_events})
   end
 
   @doc """
@@ -111,9 +111,9 @@ defmodule OMG.Watcher.ExitProcessor do
     {:reply, {:ok, db_updates}, new_state}
   end
 
-  def handle_call({:new_in_flight_exits, exits}, _from, state) do
+  def handle_call({:new_in_flight_exits, events}, _from, state) do
     in_flight_exits_contract_data =
-      Enum.map(exits, fn %{tx_hash: hash} ->
+      Enum.map(events, fn %{tx_hash: hash} ->
         {:ok, ife_contract_data} =
           hash
           |> InFlightExitInfo.get_exit_id_from_tx_hash()
@@ -123,7 +123,7 @@ defmodule OMG.Watcher.ExitProcessor do
         ife_contract_data
       end)
 
-    {new_state, db_updates} = Core.new_in_flight_exits(state, exits, in_flight_exits_contract_data)
+    {new_state, db_updates} = Core.new_in_flight_exits(state, events, in_flight_exits_contract_data)
     {:reply, {:ok, db_updates}, new_state}
   end
 
