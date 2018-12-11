@@ -112,18 +112,7 @@ defmodule OMG.Watcher.ExitProcessor do
   end
 
   def handle_call({:new_in_flight_exits, events}, _from, state) do
-    in_flight_exits_contract_data =
-      Enum.map(events, fn %{tx_hash: hash} ->
-        {:ok, ife_contract_data} =
-          hash
-          |> InFlightExitInfo.get_exit_id_from_tx_hash()
-          |> Eth.RootChain.get_in_flight_exit()
-
-        # TODO: read tx_data
-        ife_contract_data
-      end)
-
-    {new_state, db_updates} = Core.new_in_flight_exits(state, events, in_flight_exits_contract_data)
+    {new_state, db_updates} = Core.new_in_flight_exits(state, events)
     {:reply, {:ok, db_updates}, new_state}
   end
 

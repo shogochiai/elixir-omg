@@ -295,6 +295,7 @@ defmodule OMG.Eth.RootChain do
 
   defp get_in_flight_data(hash) do
     {:ok, eth_tx} = Ethereumex.HttpClient.eth_get_transaction_by_hash(hash)
+    {:ok, eth_block} = Ethereumex.HttpClient.eth_get_block_by_number(eth_tx["blockHash"], false)
 
     ABI.decode(
       %ABI.FunctionSelector{
@@ -304,9 +305,11 @@ defmodule OMG.Eth.RootChain do
       },
       from_hex(eth_tx["input"])
     )
-    |> (&Enum.zip([:tx_bytes, :intput_txs, :inputs_inclusion_proofs, :signatures], &1)).()
-    |> Map.new()
+#    |> (&Enum.zip([:tx_bytes, :intput_txs, :inputs_inclusion_proofs, :signatures], &1)).()
+#    |> Map.new()
+    Map.new()
     |> Map.drop([:intput_txs, :inputs_inclusion_proofs])
+    |> Map.put(:timestamp, from_hex(eth_block["timestamp"]))
 
   end
 

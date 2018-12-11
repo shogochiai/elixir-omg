@@ -100,15 +100,11 @@ defmodule OMG.Watcher.ExitProcessor.Core do
       when length(exits) != length(in_flight_exits_contract_data),
       do: {:error, :unexpected_events}
 
-  def new_in_flight_exits(%{in_flight_exits: ifes} = state, new_ifes, in_flight_exits_contract_data) do
+  def new_in_flight_exits(%{in_flight_exits: ifes} = state, new_ifes_events) do
     new_ifes_kv_pairs =
-      new_ifes
-      |> Enum.zip(in_flight_exits_contract_data)
-      |> Enum.map(fn {ife, {tx_bytes, signatures, timestamp}} ->
-        {
-          ife.tx_hash,
-          InFlightExitInfo.build_in_flight_transaction_info(tx_bytes, signatures, timestamp)
-        }
+      new_ifes_events
+      |> Enum.map(fn %{tx_bytes: tx_bytes, signatures: signatures, timestamp: timestamp} ->
+        InFlightExitInfo.build_in_flight_transaction_info(tx_bytes, signatures, timestamp)
       end)
 
     db_updates =

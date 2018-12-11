@@ -55,10 +55,13 @@ defmodule OMG.Watcher.ExitProcessor.InFlightExitInfo do
         sigs: tx_signatures
       }
 
+    {
+      Transaction.hash(raw_tx),
       %__MODULE__{
         tx: struct(Transaction.Signed, signed_tx_map),
         timestamp: timestamp
       }
+    }
     end
   end
 
