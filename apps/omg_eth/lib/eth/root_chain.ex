@@ -62,6 +62,29 @@ defmodule OMG.Eth.RootChain do
     )
   end
 
+  def start_in_flight_exit(
+        in_flight_tx,
+        input_txs,
+        input_txs_inclusion_proofs,
+        in_flight_tx_sigs,
+        from,
+        contract \\ nil,
+        opts \\ []
+      ) do
+    defaults = @tx_defaults |> Keyword.put(:gas, 1_000_000)
+    opts = defaults |> Keyword.merge(opts)
+
+    contract = contract || from_hex(Application.get_env(:omg_eth, :contract_addr))
+
+    Eth.contract_transact(
+      from,
+      contract,
+      "startInFlightExit(bytes,bytes,bytes,bytes)",
+      [in_flight_tx, input_txs, input_txs_inclusion_proofs, in_flight_tx_sigs],
+      opts
+    )
+  end
+
   def start_exit(utxo_position, txbytes, proof, sigs, from, contract \\ nil, opts \\ []) do
     defaults = @tx_defaults |> Keyword.put(:gas, 1_000_000)
     opts = defaults |> Keyword.merge(opts)
@@ -159,22 +182,6 @@ defmodule OMG.Eth.RootChain do
     Eth.call_contract(contract, "getExit(uint256)", [utxo_pos], [:address, :address, {:uint, 256}])
   end
 
-  @doc """
-  Returns in flight exit for a specific id. Calls contract method.
-  """
-  def get_in_flight_exit(in_flight_exit_id, contract \\ nil) do
-    contract = contract || from_hex(Application.get_env(:omg_eth, :contract_addr))
-    # TODO: add convenience method
-    Eth.call_contract(contract, "inFlightExits(uint192)", [in_flight_exit_id], [
-      {:uint, 256},
-      {:uint, 256},
-      [:address, :address, {:uint, 256}],
-      [:address, :address, {:uint, 256}],
-      :address,
-      {:uint, 256}
-    ])
-  end
-
   def get_child_chain(blknum, contract \\ nil) do
     contract = contract || from_hex(Application.get_env(:omg_eth, :contract_addr))
     Eth.call_contract(contract, "getChildChain(uint256)", [blknum], [{:bytes, 32}, {:uint, 256}])
@@ -222,12 +229,20 @@ defmodule OMG.Eth.RootChain do
          do: {:ok, Enum.map(logs, &decode_exit_started/1)}
   end
 
-  def get_in_flight_exits(block_from, block_to, contract \\ nil) do
+  @doc """
+  Returns InFlightExit from a range of blocks.
+  """
+  def get_in_flight_exit_started(block_from, block_to, contract \\ nil) do
     contract = contract || from_hex(Application.get_env(:omg_eth, :contract_addr))
     signature = "InFlightExitStarted(address,bytes32)"
 
-    with {:ok, logs} <- Eth.get_ethereum_events(block_from, block_to, signature, contract),
-         do: {:ok, Enum.map(logs, &decode_in_flight_exit_started/1)}
+    with {:ok, logs} <- Eth.get_ethereum_events(block_from, block_to, signature, contract) do
+      {:ok,
+       logs
+       |> Enum.map(fn log ->
+         get_in_flight_data(log["transactionHash"])
+       end)}
+    end
   end
 
   @doc """
@@ -278,17 +293,21 @@ defmodule OMG.Eth.RootChain do
     )
   end
 
-  defp decode_in_flight_exit_started(log) do
-    non_indexed_keys = [:tx_hash]
-    non_indexed_keys_types = [{:bytes, 32}]
-    indexed_keys = [:initiator]
-    indexed_keys_types = [:address]
+  defp get_in_flight_data(hash) do
+    {:ok, eth_tx} = Ethereumex.HttpClient.eth_get_transaction_by_hash(hash)
 
-    Eth.parse_events_with_indexed_fields(
-      log,
-      {non_indexed_keys, non_indexed_keys_types},
-      {indexed_keys, indexed_keys_types}
+    ABI.decode(
+      %ABI.FunctionSelector{
+        function: "startInFlightExit",
+        types: [:bytes, :bytes, :bytes, :bytes],
+        method_id: <<132, 97, 33, 149>>
+      },
+      from_hex(eth_tx["input"])
     )
+    |> (&Enum.zip([:tx_bytes, :intput_txs, :inputs_inclusion_proofs, :signatures], &1)).()
+    |> Map.new()
+    |> Map.drop([:intput_txs, :inputs_inclusion_proofs])
+
   end
 
   defp decode_exit_finalized(log) do
